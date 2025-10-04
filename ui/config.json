@@ -1,0 +1,7 @@
+{
+  "websocketUrl": "ws://localhost:18000/chat",
+  "apiKey": "",
+  "exportDirectory": "D:\\proj\\research-agent-system\\ui\\exports",
+  "theme": "light",
+  "apiServerUrl": "http://localhost:18000"
+}

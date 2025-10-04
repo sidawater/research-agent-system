@@ -1,0 +1,24 @@
+services:
+  research-service:
+    image: sidawater/research-service:${RESEARCH_SERVICE_VERSION}
+    container_name: research-service
+    ports:
+      - "18000:8000"
+    volumes:
+      - ./data:/data
+    environment:
+      - EXPORT_HOME=/app/var
+      - MONGO_HOST=mongodb
+      - MONGO_PORT=27017
+      - MONGO_DATABASE=research-messages
+    depends_on:
+      - mongodb
+
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    restart: always
+    volumes:
+      - ./data/mongo-data:/data/db

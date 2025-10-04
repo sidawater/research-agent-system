@@ -1,0 +1,25 @@
+[agent.search]
+enabled = true
+provider = "arxiv"
+api_key = "sk-d6971d868a554e4ca82f0b1183f5b28a"
+base_url = "https://api.deepseek.com/v1"
+
+[agent.summary]
+enabled = true
+format = "markdown"
+api_key = "sk-d6971d868a554e4ca82f0b1183f5b28a"
+base_url = "https://api.deepseek.com/v1"
+
+[agent.export]
+enabled = false
+output_dir = "./exports"
+
+[flow]
+max_iterations = 10
+timeout = 300
+
+[system]
+debug = false
+log_level = "INFO"
+# 是否在每次修改文件前询问用户确认
+confirm_modifications = true

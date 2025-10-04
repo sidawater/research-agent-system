@@ -1,0 +1,26 @@
+services:
+  research-base:
+    build:
+      context: ./research
+      dockerfile: Dockerfile-base
+    image: sidawater/research-base:${RESEARCH_BASE_VERSION}
+    volumes:
+      - ./research:/app
+      - ./var:/app/var
+    environment:
+      - EXPORT_HOME=/app/var
+
+  research-service:
+    build:
+      context: ./research
+      dockerfile: Dockerfile
+      args:
+        - RESEARCH_BASE_VERSION=${RESEARCH_BASE_VERSION}
+    image: sidawater/research-service:${RESEARCH_SERVICE_VERSION}
+    volumes:
+      - ./research:/app
+      - ./var:/app/var
+    environment:
+      - EXPORT_HOME=/app/var
+    depends_on:
+      - research-base

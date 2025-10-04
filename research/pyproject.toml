@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "research-agent"
+version = "0.1.0"
+description = "An intelligent research agent system for academic research"
+authors = [
+    {name = "Research Team", email = "research@example.com"}
+]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    # Web framework
+    "fastapi>=0.68.0,<0.69.0",
+    "uvicorn>=0.15.0,<0.16.0",
+    
+    # Database
+    "pymongo>=4.0.0,<5.0.0",
+    "motor>=3.0.0,<4.0.0",
+    
+    # Configuration
+    "toml>=0.10.2",
+    "python-dotenv>=0.19.0",
+    
+    # AI and LangChain
+    "langchain>=0.1.0",
+    "langchain-openai>=0.1.0",
+    "langgraph>=0.1.0",
+    
+    # Utilities
+    "pydantic>=2.0.0,<3.0.0",
+    "websockets>=10.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "black>=21.0",
+    "flake8>=3.9.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*", "config*", "core*", "db*", "store*"]

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI研究助手 - 智能文献管理与报告生成</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 顶部标题栏 -->
+        <header class="header">
+            <div class="header-left">
+                <h1 class="app-title">AI研究助手</h1>
+                <span class="app-subtitle">智能文献管理与报告生成</span>
+            </div>
+            <div class="header-right">
+                <button id="settingsBtn" class="header-btn" title="设置">
+                    <span class="btn-icon">⚙️</span>
+                    <span class="btn-text">设置</span>
+                </button>
+                <button id="helpBtn" class="header-btn" title="帮助">
+                    <span class="btn-icon">❓</span>
+                    <span class="btn-text">帮助</span>
+                </button>
+            </div>
+        </header>
+        
+        <!-- 主内容区域 -->
+        <div class="main-content">
+            <!-- 左侧边栏 - 聊天记录 -->
+            <div class="left-sidebar">
+                <div class="history-panel">
+                    <div class="panel-header">
+                        <h3 class="panel-title">对话记录</h3>
+                        <button id="newChatBtn" class="icon-btn" title="新建对话">➕</button>
+                    </div>
+                    <div class="history-content">
+                        <div id="conversationsList" class="conversations-list">
+                            <div class="conversation-item active" data-id="new">
+                                <div class="conversation-title">新对话</div>
+                                <div class="conversation-time">刚刚</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 中间主面板 -->
+            <div class="main-panel">
+                <!-- 选项卡导航 -->
+                <div class="tab-navigation">
+                    <button class="tab-button active" data-tab="chat">对话</button>
+                    <button class="tab-button" data-tab="report">报告预览</button>
+                    <button class="tab-button" data-tab="reference">文献预览</button>
+                </div>
+                
+                <!-- 选项卡内容 -->
+                <div class="tab-content">
+                    <!-- 对话选项卡 -->
+                    <div id="chat-tab" class="tab-pane active">
+                        <div class="chat-container">
+                            <div class="chat-messages" id="chatMessages">
+                                <div class="welcome-message">
+                                    <div class="welcome-icon">🤖</div>
+                                    <h2>欢迎使用AI研究助手</h2>
+                                    <p>我可以帮您：</p>
+                                    <ul class="feature-list">
+                                        <li>🔍 智能检索相关文献</li>
+                                        <li>📝 自动生成研究报告</li>
+                                        <li>📚 管理参考文献</li>
+                                        <li>📤 导出完整报告文档</li>
+                                    </ul>
+                                    <p>请在下方输入您的研究问题开始对话。</p>
+                                </div>
+                            </div>
+                            
+                            <!-- 当前动作状态显示 -->
+                            <div class="action-status" id="actionStatus" style="display: none;">
+                                <div class="action-content">
+                                    <span class="action-icon">⏳</span>
+                                    <span class="action-text" id="actionText">正在处理...</span>
+                                </div>
+                            </div>
+                            
+                            <div class="chat-input-container">
+                                <div class="input-toolbar">
+                                    <button id="clearChatBtn" class="tool-btn" title="清空对话">🗑️</button>
+                                </div>
+                                <textarea 
+                                    id="chatInput" 
+                                    class="chat-input" 
+                                    placeholder="请输入您的研究问题或需求..."
+                                    rows="3"
+                                ></textarea>
+                                <div class="input-actions">
+                                    <label class="export-checkbox" style="display: none;">
+                                        <input type="checkbox" id="needExport">
+                                        <span class="checkmark"></span>
+                                        导出报告
+                                    </label>
+                                    <button id="sendBtn" class="send-btn" disabled>
+                                        <span class="send-icon">📤</span>
+                                        <span class="send-text">发送</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 报告预览选项卡 -->
+                    <div id="report-tab" class="tab-pane">
+                        <div class="report-viewer">
+                            <div class="viewer-header">
+                                <h3 id="reportViewerTitle">报告预览</h3>
+                                <button id="editReportBtn" class="btn btn-secondary">编辑</button>
+                            </div>
+                            <div class="viewer-content">
+                                <div id="reportContent" class="markdown-content">
+                                    <p class="empty-message">暂无报告内容</p>
+                                </div>
+                                <textarea id="reportEditor" class="markdown-editor" style="display: none;"></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 文献预览选项卡 -->
+                    <div id="reference-tab" class="tab-pane">
+                        <div class="reference-viewer">
+                            <div class="viewer-header">
+                                <h3 id="referenceViewerTitle">文献预览</h3>
+                            </div>
+                            <div class="viewer-content">
+                                <div id="referenceContent" class="web-preview">
+                                    <div class="empty-message">
+                                        <p>选择右侧的参考文献进行预览</p>
+                                        <p class="hint">本地文献将显示文件内容，在线文献将显示网页预览</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 右侧边栏 -->
+            <div class="right-sidebar">
+                <!-- 对话状态面板 -->
+                <div class="status-panel">
+                    <h3 class="panel-title">对话状态</h3>
+                    <div class="status-content">
+                        <div class="status-item">
+                            <span class="status-label">连接状态:</span>
+                            <span class="status-value" id="connectionStatus">未连接</span>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">当前会话:</span>
+                            <span class="status-value" id="currentSession">新对话</span>
+                        </div>
+                        <div class="progress-container">
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progressFill"></div>
+                            </div>
+                            <span class="progress-text" id="progressText">0%</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 报告标题面板 -->
+                <div class="report-titles-panel">
+                    <div class="panel-header">
+                        <h3 class="panel-title">报告标题</h3>
+                        <button id="exportReportBtn" class="icon-btn" title="导出报告">📤</button>
+                    </div>
+                    <div class="panel-content">
+                        <div id="reportTitlesList" class="report-titles-list">
+                            <div class="empty-message">报告生成后将显示在这里</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 参考文献面板 -->
+                <div class="references-panel">
+                    <div class="panel-header">
+                        <h3 class="panel-title">参考文献</h3>
+                        <span class="badge" id="referencesCount">0</span>
+                    </div>
+                    <div class="references-content">
+                        <div id="referencesList" class="references-list">
+                            <div class="empty-message">暂无参考文献</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 状态栏 -->
+        <footer class="status-bar">
+            <div class="status-left">
+                <span class="status-text" id="statusText">就绪</span>
+            </div>
+            <div class="status-right">
+                <span class="version-info">v1.0.0</span>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- 设置对话框 -->
+    <div id="settingsDialog" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>应用设置</h2>
+                <button class="close-btn" id="closeSettings">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="settingsForm">
+                    <div class="form-section">
+                        <h3>服务端连接</h3>
+                        <div class="form-group">
+                            <label for="websocketUrl">WebSocket 服务器地址:</label>
+                            <input type="text" id="websocketUrl" name="websocketUrl" 
+                                   placeholder="ws://localhost:8080">
+                        </div>
+                        <div class="form-group">
+                            <label for="apiServerUrl">API 服务器地址:</label>
+                            <input type="text" id="apiServerUrl" name="apiServerUrl" 
+                                   placeholder="http://127.0.0.1:8000">
+                        </div>
+                        <div class="form-group">
+                            <label for="apiKey">API 密钥:</label>
+                            <input type="password" id="apiKey" name="apiKey" 
+                                   placeholder="输入您的API密钥">
+                        </div>
+                        <button type="button" id="testConnectionBtn" class="test-btn">
+                            测试连接
+                        </button>
+                    </div>
+                    
+                    <div class="form-section">
+                        <h3>文件导出</h3>
+                        <div class="form-group">
+                            <label for="exportDirectory">导出目录:</label>
+                            <div class="directory-selector">
+                                <input type="text" id="exportDirectory" name="exportDirectory" 
+                                       readonly>
+                                <button type="button" id="selectDirectoryBtn" class="select-btn">
+                                    选择目录
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-section">
+                        <h3>界面设置</h3>
+                        <div class="form-group">
+                            <label for="themeSelect">主题:</label>
+                            <select id="themeSelect" name="theme">
+                                <option value="light">浅色主题</option>
+                                <option value="dark">深色主题</option>
+                                <option value="auto">跟随系统</option>
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="cancelSettings" class="btn btn-secondary">取消</button>
+                <button type="button" id="saveSettings" class="btn btn-primary">保存设置</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 帮助对话框 -->
+    <div id="helpDialog" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>帮助信息</h2>
+                <button class="close-btn" id="closeHelp">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="help-section">
+                    <h3>应用信息</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">应用版本:</span>
+                            <span class="info-value">v1.0.0</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">服务版本:</span>
+                            <span class="info-value" id="serviceVersion">未连接</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Electron:</span>
+                            <span class="info-value" id="electronVersion">加载中...</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Node.js:</span>
+                            <span class="info-value" id="nodeVersion">加载中...</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="help-section">
+                    <h3>使用指南</h3>
+                    <ul class="guide-list">
+                        <li>在输入框中输入研究问题开始对话</li>
+                        <li>AI将自动检索相关文献并生成报告</li>
+                        <li>点击右侧参考文献可以查看详情</li>
+                        <li>使用导出功能保存完整报告</li>
+                    </ul>
+                </div>
+                
+                <div class="help-section">
+                    <h3>快捷键</h3>
+                    <ul class="guide-list">
+                        <li>Ctrl/Cmd + Enter: 发送消息</li>
+                        <li>Ctrl/Cmd + E: 导出报告</li>
+                        <li>Ctrl/Cmd + Q: 退出应用</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="closeHelpBtn" class="btn btn-primary">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>
