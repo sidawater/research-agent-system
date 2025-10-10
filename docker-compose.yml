@@ -5,7 +5,7 @@ services:
     ports:
       - "18000:8000"
     volumes:
-      - ./data:/data
+      - ./var/data:/data
     environment:
       - EXPORT_HOME=/app/var
       - MONGO_HOST=mongodb
@@ -21,4 +21,4 @@ services:
       - "27017:27017"
     restart: always
     volumes:
-      - ./data/mongo-data:/data/db
+      - ./var/data/mongo-data:/data/db
