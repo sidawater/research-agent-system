@@ -10,14 +10,6 @@ class DictObject(dict):
     def __setattr__(self, key, value):
         self[key] = value
 
-    # def __str__(self):    # debug 用
-    #     old = super().__str__()
-    #     return f'DictObject({old})'
-
-    # def __repr__(self):    # debug 用
-    #     old = super().__repr__()
-    #     return f'DictObject({old})'
-
     @classmethod
     def trans_from_dict(cls, item: dict):
         """

@@ -1,10 +1,13 @@
+import sys
 from app import create_app
-from core import setup_core
 from config import Config
 
-Config.load_from_toml(r'/data/config/research-agent.toml')
+if len(sys.argv) < 2:
+    config_file = r'/data/config/research-agent.toml'
+else:
+    config_file = sys.argv[1]
 
-setup_core()
+Config.load_from_toml(config_file)
 app = create_app()
 
 if __name__ == "__main__":

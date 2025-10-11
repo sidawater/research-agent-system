@@ -1,0 +1,13 @@
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景透明 -->
+  
+  <!-- 打开的书简化版 -->
+  <path d="M7 8 L11 5 L17 8 L17 16 L11 19 L7 16 Z" stroke="#4299e1" stroke-width="1.5" fill="none" stroke-linejoin="round"/>
+  
+  <!-- 灯泡简化版 -->
+  <g transform="translate(12,10) scale(0.4)">
+    <circle cx="0" cy="0" r="10" fill="none" stroke="#4299e1" stroke-width="1.5"/>
+    <path d="M-4 -3 Q0 -7 4 -3" fill="none" stroke="#4299e1" stroke-width="1.5"/>
+    <rect x="-3" y="4" width="6" height="3" fill="#4299e1"/>
+  </g>
+</svg>

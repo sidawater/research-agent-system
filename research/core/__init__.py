@@ -13,4 +13,3 @@ def setup_core():
     Path(export_home).mkdir(parents=True, exist_ok=True)
 
     print(f"✅ Core 项目初始化完成")
-    print(f"📁 导出目录: {os.path.abspath(export_home)}")

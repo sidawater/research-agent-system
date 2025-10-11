@@ -1,13 +1,13 @@
 [agent.search]
 enabled = true
 provider = "arxiv"
-api_key = "sk-d6971d868a554e4ca82f0b1183f5b28a"
+api_key = "sk-xxx"
 base_url = "https://api.deepseek.com/v1"
 
 [agent.summary]
 enabled = true
 format = "markdown"
-api_key = "sk-d6971d868a554e4ca82f0b1183f5b28a"
+api_key = "sk-xxx"
 base_url = "https://api.deepseek.com/v1"
 
 [agent.export]

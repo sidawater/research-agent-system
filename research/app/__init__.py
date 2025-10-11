@@ -1,6 +1,18 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from db.mongo import mongodb
 from config import current_config
+
+
+async def init_prompts():
+    from app.handler.prompts import get_all_prompts
+    from core import setup_core
+    from core.agents.prompts import SystemPrompts
+
+    pms = await get_all_prompts()
+    for key, prompt in pms.items():
+        SystemPrompts.set(key, prompt)
+    setup_core()
 
 
 def create_app():
@@ -19,6 +31,9 @@ def create_app():
     from app.routers import chat
     app.include_router(chat.router)
 
+    from app.routers.prompts import router as prompts_router
+    app.include_router(prompts_router)
+
     from app.ws.flow import websocket_endpoint
     app.add_api_websocket_route('/chat', websocket_endpoint, name='chat')
 
@@ -26,4 +41,15 @@ def create_app():
     async def root():
         return {"message": "Welcome to Research Agent System"}
 
+    @app.on_event("startup")
+    async def on_startup():
+        await init_prompts()
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     return app

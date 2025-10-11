@@ -8,7 +8,6 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-build/
 develop-eggs/
 dist/
 downloads/
@@ -220,3 +219,5 @@ $RECYCLE.BIN/
 
 # Poetry
 poetry.lock
+
+client/release*

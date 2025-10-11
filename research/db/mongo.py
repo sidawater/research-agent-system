@@ -78,6 +78,10 @@ class BaseMongoManager:
 
         session = None
         try:
+            # 检查当前运行中的事件循环
+            import asyncio
+            loop = asyncio.get_running_loop()
+
             session = await self.client.start_session()
             yield session
         except Exception as e:
@@ -85,7 +89,11 @@ class BaseMongoManager:
             raise
         finally:
             if session:
-                session.end_session()
+                try:
+                    session.end_session()
+                except:
+                    # 忽略会话结束时的异常
+                    pass
 
     @asynccontextmanager
     async def transaction_context(self) -> AsyncGenerator[motor.motor_asyncio.AsyncIOMotorClientSession, None]:

@@ -1,10 +1,10 @@
-import json
+import traceback
 import datetime
 from typing import Dict, List, Optional
 
 from pydantic import BaseModel
 from core.common import get_logger
-from core.common.schemas import ResearchState
+from core.common.schemas import ResearchState, AcademicSearchResult
 from db.mongo import mongodb
 
 logger = get_logger(__name__)
@@ -34,7 +34,6 @@ class FlowHandler:
     ):
         self.graph = graph
         self.session: Session = session
-        # self.state = self.session.research_state
 
     async def handle(self):
         """
@@ -47,8 +46,8 @@ class FlowHandler:
 
         try:
             async for event in self.graph.astream_events(
-                self.session.research_state,
-                version="v2"
+                    self.session.research_state,
+                    version="v2"
             ):
                 # logger.info(f"graph astream_events: {type(event)} {event}")
                 event_type = event['event']
@@ -59,7 +58,7 @@ class FlowHandler:
                 if old_signal != log_text:
                     logger.info(f"graph astream_events: {log_text}")
                     old_signal = log_text
-                    logger.info(f"{event}")
+                    # logger.info(f"{event}")
 
                 if event_type == "on_chain_start":
                     yield {"type": "action", "data": f"【{node}】开始..."}
@@ -70,6 +69,8 @@ class FlowHandler:
                         yield {"type": tp, "data": chunk.content}
                 elif event_type == "on_chain_end":
                     await self.save_state(event)
+                    # Ensure session is saved to database before notifying client
+                    await self.save_session_to_db()
                     yield {'type': 'action', 'data': f"【{node}】完成."}
                     if node == "academic_search" and self.session.research_state.academic_search_result:
                         yield {"type": "references",
@@ -87,26 +88,26 @@ class FlowHandler:
                     yield {'type': 'action', 'data': f"[{node}]:{event_type}"}
 
         except Exception as e:
-            logger.error(f"处理流程时发生错误: {e}")
+            logger.error(f"处理流程时发生错误: {e} {traceback.format_exc()}")
             raise
         finally:
             await self.save_session_to_db()
 
     async def save_state(self, event: dict):
         node = event.get('metadata', {}).get('langgraph_node')
-        output = event.get('data', {}).get('output')
-        logger.info(f"处理结果: {node} ")
+        output = event.get('data', {}).get('output', {})
         if not isinstance(output, dict):
+            logger.warning(f"处理结果: {node} 输出不是dict类型-> {type(output)} \n-> {event}")
             return
+        value = output.get('value')
+        logger.info(f"处理结果: {node} ")
 
         if node == "academic_search":
-            res = output.get("academic_search_result")
-            if res:
-                self.session.research_state.academic_search_result = res
+            if isinstance(value, AcademicSearchResult):
+                self.session.research_state.academic_search_result = value
         elif node == "write_report":
-            res = output.get("final_report")
-            if res:
-                self.session.research_state.final_report = res
+            if isinstance(value, str):
+                self.session.research_state.final_report = value
         await self.save_session_to_db()
 
     async def save_session_to_db(self):
@@ -116,10 +117,9 @@ class FlowHandler:
         """
         # 更新会话的更新时间
         self.session.updated_at = datetime.datetime.now()
-        
+
         doc = self.session.model_dump()
-        logger.info(f'document: {doc}')
-        
+
         if doc.get("created_at"):
             doc["created_at"] = doc["created_at"].isoformat()
         if doc.get("updated_at"):
@@ -127,12 +127,12 @@ class FlowHandler:
 
         if mongodb.db is None:
             await mongodb.connect()
-        
+
         # 使用update_one方法更新或插入会话文档
         res = await mongodb.update_one(
-            "sessions", 
+            "sessions",
             {"session_id": self.session.session_id},
-            {"$set": doc}, 
+            {"$set": doc},
             upsert=True
         )
         logger.info(f"保存会话: {res}")
@@ -145,33 +145,41 @@ class FlowHandler:
         :param session_id: str 类型，会话ID
         :returns: Session 类型，查询到的会话对象
         """
-        # 确保MongoDB连接
-        if mongodb.db is None:
-            await mongodb.connect()
-        
-        # 从MongoDB中查找对应session_id的文档
-        doc = await mongodb.find_one("sessions", {"session_id": session_id})
-        
-        if doc:
-            # 移除MongoDB的_id字段
-            doc.pop("_id", None)
-            
-            # 处理research_state字段
-            research_state_data = doc.get("research_state", {})
-            print(research_state_data)
-            if research_state_data:
-                doc["research_state"] = ResearchState(**research_state_data)
-            
-            # 处理时间字段
-            if doc.get("created_at"):
-                if isinstance(doc["created_at"], str):
-                    doc["created_at"] = datetime.datetime.fromisoformat(doc["created_at"])
-            if doc.get("updated_at"):
-                if isinstance(doc["updated_at"], str):
-                    doc["updated_at"] = datetime.datetime.fromisoformat(doc["updated_at"])
-            
-            return Session(**doc)
-        return None
+        try:
+            # 确保MongoDB连接
+            if mongodb.db is None:
+                await mongodb.connect()
+
+            # 从MongoDB中查找对应session_id的文档
+            doc = await mongodb.find_one("sessions", {"session_id": session_id})
+
+            if doc:
+                # 移除MongoDB的_id字段
+                doc.pop("_id", None)
+
+                # 处理research_state字段
+                research_state_data = doc.get("research_state", {})
+                if research_state_data:
+                    doc["research_state"] = ResearchState(**research_state_data)
+
+                # 处理时间字段
+                if doc.get("created_at"):
+                    if isinstance(doc["created_at"], str):
+                        doc["created_at"] = datetime.datetime.fromisoformat(doc["created_at"])
+                if doc.get("updated_at"):
+                    if isinstance(doc["updated_at"], str):
+                        doc["updated_at"] = datetime.datetime.fromisoformat(doc["updated_at"])
+
+                return Session(**doc)
+            return None
+        except RuntimeError as e:
+            if "Event loop is closed" in str(e):
+                logger.warning(f"Event loop is closed when trying to get session {session_id}")
+                return None
+            raise
+        except Exception as e:
+            logger.error(f"Error getting session {session_id}: {e}")
+            return None
 
     @classmethod
     async def create_session(cls, session_id: str, user_id: str = "") -> 'Session':
@@ -185,15 +193,17 @@ class FlowHandler:
         # 创建默认的ResearchState
         research_state = ResearchState(
             query="",
+            research_title='',
             academic_search_result=None,
-            final_report=None,
             report_title=None,
-            user_decision_export=None,
-            user_decision_download=None,
-            export_path=None,
-            downloaded_pdfs=[]
+            final_report=None,
+            waiting_for_user=False,
+            search_results_satisfactory=False,
+            supply_query=[],
+            coaching_opinion=[],
+
         )
-        
+
         # 创建Session对象
         now = datetime.datetime.now()
         session = Session(
@@ -204,7 +214,7 @@ class FlowHandler:
             created_at=now,
             updated_at=now
         )
-        
+
         # 保存到MongoDB
         doc = session.model_dump()
         # 处理时间字段序列化
@@ -212,12 +222,12 @@ class FlowHandler:
             doc["created_at"] = doc["created_at"].isoformat()
         if doc.get("updated_at"):
             doc["updated_at"] = doc["updated_at"].isoformat()
-        
+
         if mongodb.db is None:
             await mongodb.connect()
-            
+
         await mongodb.insert_one("sessions", doc)
-        
+
         return session
 
     @classmethod
