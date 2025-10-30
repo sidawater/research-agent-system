@@ -59,16 +59,25 @@ function clearAllModules(): void {
 // 用户点击历史对话列表中的某个对话
 async function enterHistoricalConversation(conversationId: string): Promise<void> {
   try {
-    // 1. 获取对话详细信息
-    const conversation = await fetchConversationDetail(conversationId)
+    // 1. 并行获取对话详细信息和消息历史
+    // 使用专用的消息接口以获得更好的性能和分页支持
+    const [conversation, messagesData] = await Promise.all([
+      fetchConversationDetail(conversationId),
+      fetchConversationMessages(conversationId, 100, 0)
+    ])
     
     // 2. 设置当前会话ID
     setCurrentSessionId(conversation.session_id)
     setCurrentSessionName(conversation.session_name || conversation.research_state.query)
     
     // 3. 渲染对话消息
-    if (conversation.messages && conversation.messages.length > 0) {
-      setMessages(conversation.messages)
+    // 优先使用专用消息接口的数据，如果为空则回退到对话文档中的消息
+    const serverMessages = messagesData?.messages?.length > 0 
+      ? messagesData.messages 
+      : (conversation?.messages || [])
+    
+    if (serverMessages.length > 0) {
+      setMessages(serverMessages)
     } else {
       // 如果没有消息记录，生成初始消息
       setMessages([{
@@ -98,6 +107,11 @@ async function enterHistoricalConversation(conversationId: string): Promise<void
     // 7. 建立WebSocket连接
     connectWebSocket(conversationId)
     
+    // 8. 如果有更多消息，在控制台提示
+    if (messagesData?.total_count > messagesData?.messages?.length) {
+      console.log(`已加载 ${messagesData.messages.length} 条消息，总共 ${messagesData.total_count} 条`)
+    }
+    
   } catch (error) {
     console.error('Failed to load conversation:', error)
     showError('加载对话失败，请重试')
@@ -121,8 +135,18 @@ function determineResearchPhase(researchState: ResearchState): ResearchPhase {
 **历史对话加载流程**
 
 ```text
-点击历史对话 → 获取对话详情 → 设置会话ID → 渲染消息 → 渲染参考文献 → 渲染报告 → 恢复研究阶段 → 建立WebSocket连接
+点击历史对话 → 并行获取对话详情和消息历史 → 设置会话ID → 渲染消息 → 渲染参考文献 → 渲染报告 → 恢复研究阶段 → 建立WebSocket连接
 ```
+
+**消息加载策略**
+
+系统使用以下策略优化消息加载性能：
+
+1. **并行请求**：同时请求对话详情和消息历史，减少等待时间
+2. **专用接口**：使用 `/messages/{session_id}` 接口获取消息，支持分页和更好的性能
+3. **数据回退**：如果专用接口无数据，回退使用对话文档中的消息字段
+4. **默认限制**：首次加载最近100条消息，避免加载过多数据
+5. **分页支持**：为未来实现"加载更多"功能预留接口支持
 
 ##### B. 新建对话
 
@@ -671,14 +695,42 @@ async function loadMoreMessages(): Promise<void> {
   
   setIsLoadingMore(true)
   try {
-    const olderMessages = await fetchOlderMessages(currentSessionId, page)
-    setMessages(prev => [...olderMessages, ...prev])
+    const olderMessages = await fetchConversationMessages(
+      currentSessionId, 
+      100,  // limit: 每次加载100条
+      page * 100  // skip: 根据页数跳过已加载的消息
+    )
+    setMessages(prev => [...olderMessages.messages, ...prev])
     setPage(prev => prev + 1)
   } catch (error) {
     console.error('Failed to load older messages:', error)
   } finally {
     setIsLoadingMore(false)
   }
+}
+
+// API 调用示例
+async function fetchConversationMessages(
+  sessionId: string,
+  limit: number = 100,
+  skip: number = 0
+): Promise<ConversationMessagesResponse> {
+  const response = await fetch(
+    `${API_BASE}/messages/${encodeURIComponent(sessionId)}?limit=${limit}&skip=${skip}`
+  )
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`)
+  }
+  return response.json()
+}
+
+// 响应数据结构
+interface ConversationMessagesResponse {
+  session_id: string
+  total_count: number  // 总消息数
+  limit: number        // 当前限制
+  skip: number         // 当前跳过
+  messages: ServerChatMessage[]  // 消息列表
 }
 ```
 

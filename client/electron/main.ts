@@ -5,6 +5,7 @@ import fs from 'fs'
 import https from 'https'
 import http from 'http'
 import AdmZip from 'adm-zip'
+import { marked } from 'marked'
 import type { IpcMainInvokeEvent } from 'electron'
 
 interface AppConfig {
@@ -277,6 +278,9 @@ ipcMain.handle('export-report-with-pdf', async (_evt: IpcMainInvokeEvent, payloa
     await fs.promises.writeFile(mdPath, reportContent, 'utf-8')
     console.log(`Markdown saved: ${mdPath}`)
 
+    // Parse Markdown to HTML using marked (server-side, no CDN dependency)
+    const parsedHtml = await marked.parse(reportContent)
+
     // Generate PDF using a hidden BrowserWindow
     const pdfWindow = new BrowserWindow({
       show: false,
@@ -287,46 +291,73 @@ ipcMain.handle('export-report-with-pdf', async (_evt: IpcMainInvokeEvent, payloa
     })
 
     try {
-      // Create HTML with styled Markdown content
+      // Create HTML with enhanced styles for PDF generation
       const htmlContent = `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <style>
+    @page {
+      margin: 1.5cm;
+    }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 
+                   'Fira Sans', 'Droid Sans', 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif;
       line-height: 1.6;
-      padding: 40px;
-      max-width: 900px;
+      padding: 20px;
+      max-width: 100%;
       margin: 0 auto;
       color: #333;
+      font-size: 14px;
     }
     h1, h2, h3, h4, h5, h6 {
       margin-top: 24px;
       margin-bottom: 16px;
       font-weight: 600;
       line-height: 1.25;
+      page-break-after: avoid;
     }
-    h1 { font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
-    h2 { font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+    h1 { 
+      font-size: 2em; 
+      border-bottom: 2px solid #eaecef; 
+      padding-bottom: 0.3em;
+      page-break-before: auto;
+    }
+    h2 { 
+      font-size: 1.5em; 
+      border-bottom: 1px solid #eaecef; 
+      padding-bottom: 0.3em;
+    }
     h3 { font-size: 1.25em; }
+    h4 { font-size: 1.1em; }
+    h5 { font-size: 1em; }
+    h6 { font-size: 0.9em; color: #6a737d; }
+    
+    p {
+      margin: 0 0 16px 0;
+    }
+    
     code {
       background-color: #f6f8fa;
       border-radius: 3px;
       font-size: 85%;
       margin: 0;
       padding: 0.2em 0.4em;
-      font-family: 'Courier New', Courier, monospace;
+      font-family: 'Consolas', 'Monaco', 'Courier New', Courier, monospace;
     }
+    
     pre {
       background-color: #f6f8fa;
-      border-radius: 3px;
+      border-radius: 6px;
       font-size: 85%;
       line-height: 1.45;
       overflow: auto;
       padding: 16px;
+      margin: 0 0 16px 0;
+      page-break-inside: avoid;
     }
+    
     pre code {
       background-color: transparent;
       border: 0;
@@ -336,50 +367,94 @@ ipcMain.handle('export-report-with-pdf', async (_evt: IpcMainInvokeEvent, payloa
       overflow: visible;
       padding: 0;
       word-wrap: normal;
+      font-size: 100%;
     }
+    
     blockquote {
       border-left: 4px solid #dfe2e5;
       color: #6a737d;
       padding: 0 1em;
-      margin: 0;
+      margin: 0 0 16px 0;
     }
+    
     table {
       border-collapse: collapse;
       width: 100%;
       margin-bottom: 16px;
+      page-break-inside: avoid;
     }
+    
     table th, table td {
       border: 1px solid #dfe2e5;
       padding: 6px 13px;
+      text-align: left;
     }
+    
     table th {
       background-color: #f6f8fa;
       font-weight: 600;
     }
+    
+    table tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+    
     ul, ol {
       padding-left: 2em;
-      margin-top: 0;
-      margin-bottom: 16px;
+      margin: 0 0 16px 0;
     }
-    li + li {
+    
+    li {
       margin-top: 0.25em;
     }
+    
+    li > p {
+      margin: 0;
+    }
+    
     a {
       color: #0366d6;
       text-decoration: none;
     }
+    
     a:hover {
       text-decoration: underline;
+    }
+    
+    img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      margin: 16px 0;
+    }
+    
+    hr {
+      height: 0.25em;
+      padding: 0;
+      margin: 24px 0;
+      background-color: #e1e4e8;
+      border: 0;
+    }
+    
+    /* Print optimizations */
+    @media print {
+      body {
+        padding: 0;
+      }
+      h1, h2, h3, h4, h5, h6 {
+        page-break-after: avoid;
+      }
+      pre, table, blockquote {
+        page-break-inside: avoid;
+      }
+      img {
+        page-break-inside: avoid;
+      }
     }
   </style>
 </head>
 <body>
-  <div id="content"></div>
-  <script type="module">
-    import { marked } from 'https://cdn.jsdelivr.net/npm/marked@11.1.1/+esm';
-    const content = ${JSON.stringify(reportContent)};
-    document.getElementById('content').innerHTML = marked.parse(content);
-  </script>
+  ${parsedHtml}
 </body>
 </html>
 `
@@ -387,12 +462,18 @@ ipcMain.handle('export-report-with-pdf', async (_evt: IpcMainInvokeEvent, payloa
       // Load HTML content
       await pdfWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`)
       
-      // Wait for content to render
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // Wait for content to fully render
+      await new Promise<void>((resolve) => {
+        pdfWindow.webContents.once('did-finish-load', () => {
+          // Additional delay to ensure all styles are applied
+          setTimeout(() => resolve(), 500)
+        })
+      })
 
-      // Generate PDF
+      // Generate PDF with optimized settings
       const pdfData = await pdfWindow.webContents.printToPDF({
         printBackground: true,
+        pageSize: 'A4',
         margins: {
           top: 0.5,
           bottom: 0.5,

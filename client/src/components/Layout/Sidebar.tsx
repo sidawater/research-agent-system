@@ -5,7 +5,7 @@ import { useAppStore } from '../../stores/app'
 import { useChatStore } from '../../stores/chat'
 import type { ChatMessage } from '../../stores/chat'
 import { useResearchStore } from '../../stores/research'
-import { listHistory, getHistory, type ConversationHistory } from '@/services/api'
+import { listHistory, getHistory, getConversationMessages, type ConversationHistory } from '@/services/api'
 
 const { Sider } = Layout
 
@@ -62,10 +62,17 @@ const Sidebar: React.FC = () => {
       setLoading(true)
       setCurrentSession(sessionId)
       
-      const conv = await getHistory(sessionId)
+      // 并行获取对话数据和消息历史
+      const [conv, messagesData] = await Promise.all([
+        getHistory(sessionId),
+        getConversationMessages(sessionId, 100, 0)
+      ])
 
-      // messages
-      const serverMsgs = conv?.messages || []
+      // 优先使用专用消息接口的数据，如果为空则回退到对话文档中的消息
+      const serverMsgs = messagesData?.messages?.length > 0 
+        ? messagesData.messages 
+        : (conv?.messages || [])
+      
       const msgs: ChatMessage[] = (serverMsgs.length > 0
         ? serverMsgs.map((m: any) => ({
             id: crypto.randomUUID(),
@@ -86,6 +93,11 @@ const Sidebar: React.FC = () => {
 
       // phase
       setPhase(determineResearchPhase(conv))
+      
+      // 如果有更多消息，在控制台提示
+      if (messagesData?.total_count > messagesData?.messages?.length) {
+        console.log(`加载了 ${messagesData.messages.length} 条消息，总共 ${messagesData.total_count} 条`)
+      }
     } catch (err) {
       message.error(`进入对话失败: ${(err as Error).message}`)
     } finally {
