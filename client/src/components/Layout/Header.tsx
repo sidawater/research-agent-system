@@ -32,6 +32,7 @@ const AppHeader: React.FC = () => {
         <Title level={4} style={{ margin: 0, color: theme === 'light' ? '#000' : '#fff' }}>
           研究助手
         </Title>
+        <Tag color="blue" style={{ fontSize: '12px' }}>v2.0.0</Tag>
       </Space>
 
       <Space>
