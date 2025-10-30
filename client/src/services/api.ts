@@ -82,3 +82,19 @@ export async function setPrompt(key: string, prompt: string): Promise<any> {
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
   return resp.json()
 }
+
+export interface ConversationMessagesResponse {
+  session_id: string
+  total_count: number
+  limit: number
+  skip: number
+  messages: ServerChatMessage[]
+}
+
+export async function getConversationMessages(
+  sessionId: string,
+  limit: number = 100,
+  skip: number = 0
+): Promise<ConversationMessagesResponse> {
+  return jsonGet(`/messages/${encodeURIComponent(sessionId)}?limit=${limit}&skip=${skip}`)
+}

@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import https from 'https';
 import http from 'http';
+import { marked } from 'marked';
 const DEFAULT_CONFIG = {
     websocketUrl: 'ws://127.0.0.1:18000/chat',
     apiServerUrl: 'http://127.0.0.1:18000/api/v1',
@@ -213,6 +214,8 @@ ipcMain.handle('export-report', async (_evt, payload) => {
     }
 });
 ipcMain.handle('export-report-with-pdf', async (_evt, payload) => {
+    let pdfWindow = null;
+    let tempHtmlPath = null;
     try {
         const { sessionId, title, reportContent, exportDirectory } = payload;
         if (!reportContent) {
@@ -221,7 +224,8 @@ ipcMain.handle('export-report-with-pdf', async (_evt, payload) => {
         if (!exportDirectory) {
             return { success: false, error: 'Export directory not configured' };
         }
-        // Create directory: {exportDirectory}/{sessionId first 8 chars}-{today's date}
+        // Create directory: {exportDirectory}/{sessionId first 8 chars}-{today's date YYYY-MM-DD}
+        // This format matches reference downloads for consistency
         const now = new Date();
         const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
         const sessionPrefix = sessionId.substring(0, 8);
@@ -235,55 +239,75 @@ ipcMain.handle('export-report-with-pdf', async (_evt, payload) => {
         // Save Markdown file
         await fs.promises.writeFile(mdPath, reportContent, 'utf-8');
         console.log(`Markdown saved: ${mdPath}`);
-        // Generate PDF using a hidden BrowserWindow
-        const pdfWindow = new BrowserWindow({
-            show: false,
-            webPreferences: {
-                nodeIntegration: false,
-                contextIsolation: true,
-            },
-        });
-        try {
-            // Create HTML with styled Markdown content
-            const htmlContent = `
+        // Parse Markdown to HTML using marked (server-side, no CDN dependency)
+        const parsedHtml = await marked.parse(reportContent);
+        // Create HTML with enhanced styles for PDF generation
+        const htmlContent = `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <style>
+    @page {
+      margin: 1.5cm;
+    }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 
+                   'Fira Sans', 'Droid Sans', 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif;
       line-height: 1.6;
-      padding: 40px;
-      max-width: 900px;
+      padding: 20px;
+      max-width: 100%;
       margin: 0 auto;
       color: #333;
+      font-size: 14px;
     }
     h1, h2, h3, h4, h5, h6 {
       margin-top: 24px;
       margin-bottom: 16px;
       font-weight: 600;
       line-height: 1.25;
+      page-break-after: avoid;
     }
-    h1 { font-size: 2em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
-    h2 { font-size: 1.5em; border-bottom: 1px solid #eaecef; padding-bottom: 0.3em; }
+    h1 { 
+      font-size: 2em; 
+      border-bottom: 2px solid #eaecef; 
+      padding-bottom: 0.3em;
+      page-break-before: auto;
+    }
+    h2 { 
+      font-size: 1.5em; 
+      border-bottom: 1px solid #eaecef; 
+      padding-bottom: 0.3em;
+    }
     h3 { font-size: 1.25em; }
+    h4 { font-size: 1.1em; }
+    h5 { font-size: 1em; }
+    h6 { font-size: 0.9em; color: #6a737d; }
+    
+    p {
+      margin: 0 0 16px 0;
+    }
+    
     code {
       background-color: #f6f8fa;
       border-radius: 3px;
       font-size: 85%;
       margin: 0;
       padding: 0.2em 0.4em;
-      font-family: 'Courier New', Courier, monospace;
+      font-family: 'Consolas', 'Monaco', 'Courier New', Courier, monospace;
     }
+    
     pre {
       background-color: #f6f8fa;
-      border-radius: 3px;
+      border-radius: 6px;
       font-size: 85%;
       line-height: 1.45;
       overflow: auto;
       padding: 16px;
+      margin: 0 0 16px 0;
+      page-break-inside: avoid;
     }
+    
     pre code {
       background-color: transparent;
       border: 0;
@@ -293,86 +317,174 @@ ipcMain.handle('export-report-with-pdf', async (_evt, payload) => {
       overflow: visible;
       padding: 0;
       word-wrap: normal;
+      font-size: 100%;
     }
+    
     blockquote {
       border-left: 4px solid #dfe2e5;
       color: #6a737d;
       padding: 0 1em;
-      margin: 0;
+      margin: 0 0 16px 0;
     }
+    
     table {
       border-collapse: collapse;
       width: 100%;
       margin-bottom: 16px;
+      page-break-inside: avoid;
     }
+    
     table th, table td {
       border: 1px solid #dfe2e5;
       padding: 6px 13px;
+      text-align: left;
     }
+    
     table th {
       background-color: #f6f8fa;
       font-weight: 600;
     }
+    
+    table tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+    
     ul, ol {
       padding-left: 2em;
-      margin-top: 0;
-      margin-bottom: 16px;
+      margin: 0 0 16px 0;
     }
-    li + li {
+    
+    li {
       margin-top: 0.25em;
     }
+    
+    li > p {
+      margin: 0;
+    }
+    
     a {
       color: #0366d6;
       text-decoration: none;
     }
+    
     a:hover {
       text-decoration: underline;
+    }
+    
+    img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      margin: 16px 0;
+    }
+    
+    hr {
+      height: 0.25em;
+      padding: 0;
+      margin: 24px 0;
+      background-color: #e1e4e8;
+      border: 0;
+    }
+    
+    /* Print optimizations */
+    @media print {
+      body {
+        padding: 0;
+      }
+      h1, h2, h3, h4, h5, h6 {
+        page-break-after: avoid;
+      }
+      pre, table, blockquote {
+        page-break-inside: avoid;
+      }
+      img {
+        page-break-inside: avoid;
+      }
     }
   </style>
 </head>
 <body>
-  <div id="content"></div>
-  <script type="module">
-    import { marked } from 'https://cdn.jsdelivr.net/npm/marked@11.1.1/+esm';
-    const content = ${JSON.stringify(reportContent)};
-    document.getElementById('content').innerHTML = marked.parse(content);
-  </script>
+  ${parsedHtml}
 </body>
 </html>
 `;
-            // Load HTML content
-            await pdfWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
-            // Wait for content to render
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            // Generate PDF
-            const pdfData = await pdfWindow.webContents.printToPDF({
-                printBackground: true,
-                margins: {
-                    top: 0.5,
-                    bottom: 0.5,
-                    left: 0.5,
-                    right: 0.5,
-                },
+        // Create temporary HTML file for reliable loading
+        const tempDir = app.getPath('temp');
+        tempHtmlPath = join(tempDir, `report-${Date.now()}.html`);
+        await fs.promises.writeFile(tempHtmlPath, htmlContent, 'utf-8');
+        console.log(`Temporary HTML created: ${tempHtmlPath}`);
+        // Generate PDF using a hidden BrowserWindow
+        pdfWindow = new BrowserWindow({
+            show: false,
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+            },
+        });
+        // CRITICAL: Attach event listener BEFORE calling loadFile to avoid race condition
+        const renderPromise = new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                reject(new Error('Content rendering timeout after 15s'));
+            }, 15000);
+            pdfWindow.webContents.once('did-finish-load', () => {
+                console.log('did-finish-load event fired');
+                // Additional delay to ensure all styles are applied
+                setTimeout(() => {
+                    clearTimeout(timeout);
+                    resolve();
+                }, 500);
             });
-            // Save PDF file
-            await fs.promises.writeFile(pdfPath, pdfData);
-            console.log(`PDF saved: ${pdfPath}`);
-            return {
-                success: true,
-                directory: targetDir,
-                files: {
-                    mdPath,
-                    pdfPath,
-                },
-            };
-        }
-        finally {
-            pdfWindow.close();
-        }
+        });
+        // Now load the file - the listener is already attached
+        console.log('Loading HTML file...');
+        await pdfWindow.loadFile(tempHtmlPath);
+        console.log('loadFile() completed, waiting for did-finish-load...');
+        // Wait for the did-finish-load event to fire
+        await renderPromise;
+        console.log('Content fully rendered');
+        // Generate PDF with optimized settings
+        const pdfData = await pdfWindow.webContents.printToPDF({
+            printBackground: true,
+            pageSize: 'A4',
+            margins: {
+                top: 0.5,
+                bottom: 0.5,
+                left: 0.5,
+                right: 0.5,
+            },
+        });
+        console.log('PDF generated, size:', pdfData.length, 'bytes');
+        // Save PDF file
+        await fs.promises.writeFile(pdfPath, pdfData);
+        console.log(`PDF saved: ${pdfPath}`);
+        return {
+            success: true,
+            directory: targetDir,
+            files: {
+                mdPath,
+                pdfPath,
+            },
+        };
     }
     catch (err) {
         console.error('Export error:', err);
         return { success: false, error: err?.message || String(err) };
+    }
+    finally {
+        // Clean up PDF window
+        if (pdfWindow && !pdfWindow.isDestroyed()) {
+            pdfWindow.close();
+        }
+        // Clean up temporary HTML file
+        if (tempHtmlPath) {
+            try {
+                await fs.promises.unlink(tempHtmlPath);
+                console.log('Temporary HTML file cleaned up');
+            }
+            catch (cleanupErr) {
+                console.warn('Failed to cleanup temp HTML:', cleanupErr);
+            }
+        }
     }
 });
 ipcMain.handle('references:download', async (_evt, payload) => {
@@ -388,9 +500,9 @@ ipcMain.handle('references:download', async (_evt, payload) => {
             return { success: false, isPdf: false, errorMessage: 'No sessionId provided' };
         }
         const now = new Date();
-        const yyyymmdd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+        const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
         const sessionPrefix = String(sessionId).substring(0, 8);
-        const baseDir = join(exportDirectory, `${sessionPrefix}_${yyyymmdd}`);
+        const baseDir = join(exportDirectory, `${sessionPrefix}-${dateStr}`);
         await fs.promises.mkdir(baseDir, { recursive: true });
         const safeTitle = String(title || 'reference').replace(/[\\\/:*?"<>|]/g, '_').slice(0, 120);
         const twoDigitIndex = String(Math.max(1, index + 1)).padStart(2, '0');

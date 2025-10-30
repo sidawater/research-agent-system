@@ -37,21 +37,63 @@ const ChatTab: React.FC = () => {
     message.info('已确认，开始生成报告')
   }
 
+  const [isExporting, setIsExporting] = useState(false)
+
   const handleExport = async () => {
-    const { currentReport, references } = useResearchStore.getState()
+    const { currentReport } = useResearchStore.getState()
+    const { currentSession, config } = useAppStore.getState()
+
     if (!currentReport) {
-      message.warning('暂无可导出的报告')
+      message.error('No report content to export')
       return
     }
-    const result = await window.electronAPI?.exportReport?.({
-      reportContent: currentReport,
-      references,
-      title: `研究报告_${new Date().toLocaleDateString()}`,
+
+    if (!config.exportDirectory) {
+      message.error('Please configure export directory in settings first')
+      return
+    }
+
+    if (!currentSession) {
+      message.error('No active session')
+      return
+    }
+
+    // Generate automatic title based on timestamp
+    const now = new Date()
+    const timestamp = now.toISOString().replace(/[:.]/g, '-').substring(0, 19)
+    const title = `Research-Report-${timestamp}`
+
+    setIsExporting(true)
+
+    console.log('Starting export with params:', {
+      sessionId: currentSession,
+      title,
+      exportDirectory: config.exportDirectory,
+      hasContent: !!currentReport,
+      apiAvailable: !!window.electronAPI?.exportReportWithPdf
     })
-    if (!result?.success) {
-      message.error('导出失败')
-    } else {
-      message.success('导出成功')
+
+    try {
+      const result = await window.electronAPI?.exportReportWithPdf?.({
+        sessionId: currentSession!,
+        title: title,
+        reportContent: currentReport!,
+        exportDirectory: config.exportDirectory,
+      })
+      
+      console.log('Export result:', result)
+
+      if (result?.success) {
+        message.success(`Report exported successfully to ${result.directory}`)
+        console.log('Exported files:', result.files)
+      } else {
+        message.error(`Export failed: ${result?.error || 'Unknown error'}`)
+      }
+    } catch (error: any) {
+      console.error('Export error:', error)
+      message.error(`Export failed: ${error.message}`)
+    } finally {
+      setIsExporting(false)
     }
   }
 
@@ -77,13 +119,13 @@ const ChatTab: React.FC = () => {
       const { currentSession, config } = useAppStore.getState()
       const sessionPrefix = String(currentSession || '').substring(0, 8)
       const now = new Date()
-      const yyyymmdd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`
+      const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
       message.success({ 
         content: (
           <div>
             <div>{summaryMsg}</div>
             <div style={{ fontSize: '12px', marginTop: '4px' }}>
-              Saved in {config.exportDirectory}/{sessionPrefix}_{yyyymmdd}/
+              Saved in {config.exportDirectory}/{sessionPrefix}-{dateStr}/
             </div>
           </div>
         ),
@@ -174,7 +216,7 @@ const ChatTab: React.FC = () => {
             <Button type="primary" onClick={handleSend}>发送</Button>
             <Button onClick={handleConfirmAndGenerateReport} disabled={phase !== 'confirming'}>参考文献合格</Button>
             <Button onClick={handleDownloadReferences}>下载文献</Button>
-            <Button onClick={handleExport}>导出报告</Button>
+            <Button onClick={handleExport} loading={isExporting}>导出报告</Button>
           </Space>
         </div>
       </div>
