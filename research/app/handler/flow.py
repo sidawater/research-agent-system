@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from core.common import get_logger
 from core.common.schemas import ResearchState, AcademicSearchResult
 from db.mongo import mongodb
+from store.mongo.conversation import ConversationManager
 
 logger = get_logger(__name__)
 
@@ -31,9 +32,11 @@ class FlowHandler:
             self,
             graph,
             session: Session,
+            conversation_manager: ConversationManager = None,
     ):
         self.graph = graph
         self.session: Session = session
+        self.conversation_manager = conversation_manager or ConversationManager()
 
     async def handle(self):
         """
@@ -61,31 +64,97 @@ class FlowHandler:
                     # logger.info(f"{event}")
 
                 if event_type == "on_chain_start":
-                    yield {"type": "action", "data": f"【{node}】开始..."}
+                    message = {"type": "action", "data": f"【{node}】开始..."}
+                    await self.conversation_manager.save_message(
+                        session_id=self.session.session_id,
+                        role="assistant",
+                        content=message["data"],
+                        message_type=message["type"],
+                        metadata={"node": node, "event_type": event_type}
+                    )
+                    yield message
                 elif event_type == "on_chat_model_stream":
                     chunk = event["data"].get("chunk")
                     if chunk:
                         tp = "ref" if node == "academic_search" else "content"
-                        yield {"type": tp, "data": chunk.content}
+                        message = {"type": tp, "data": chunk.content}
+                        await self.conversation_manager.save_message(
+                            session_id=self.session.session_id,
+                            role="assistant",
+                            content=message["data"],
+                            message_type=message["type"],
+                            metadata={"node": node, "event_type": event_type}
+                        )
+                        yield message
                 elif event_type == "on_chain_end":
                     await self.save_state(event)
                     # Ensure session is saved to database before notifying client
                     await self.save_session_to_db()
-                    yield {'type': 'action', 'data': f"【{node}】完成."}
+                    
+                    message = {'type': 'action', 'data': f"【{node}】完成."}
+                    await self.conversation_manager.save_message(
+                        session_id=self.session.session_id,
+                        role="assistant",
+                        content=message["data"],
+                        message_type=message["type"],
+                        metadata={"node": node, "event_type": event_type}
+                    )
+                    yield message
+                    
                     if node == "academic_search" and self.session.research_state.academic_search_result:
-                        yield {"type": "references",
+                        ref_message = {"type": "references",
                                "data": self.session.research_state.academic_search_result.model_dump()}
+                        await self.conversation_manager.save_message(
+                            session_id=self.session.session_id,
+                            role="assistant",
+                            content=str(ref_message["data"]),
+                            message_type=ref_message["type"],
+                            metadata={"node": node, "event_type": event_type}
+                        )
+                        yield ref_message
                     elif node == "write_report" and self.session.research_state.final_report:
-                        yield {"type": "report",
+                        report_message = {"type": "report",
                                "data": self.session.research_state.final_report}
+                        await self.conversation_manager.save_message(
+                            session_id=self.session.session_id,
+                            role="assistant",
+                            content=report_message["data"],
+                            message_type=report_message["type"],
+                            metadata={"node": node, "event_type": event_type}
+                        )
+                        yield report_message
                 elif event_type == "on_chain_error":
                     await self.save_session_to_db()
-                    yield {'type': 'action', 'data': f"【{node}】失败."}
+                    message = {'type': 'error', 'data': f"【{node}】失败."}
+                    await self.conversation_manager.save_message(
+                        session_id=self.session.session_id,
+                        role="assistant",
+                        content=message["data"],
+                        message_type=message["type"],
+                        metadata={"node": node, "event_type": event_type}
+                    )
+                    yield message
                 elif event_type == "on_chain_interrupt":
                     await self.save_session_to_db()
-                    yield {'type': 'action', 'data': f"【{node}】中断."}
+                    message = {'type': 'action', 'data': f"【{node}】中断."}
+                    await self.conversation_manager.save_message(
+                        session_id=self.session.session_id,
+                        role="assistant",
+                        content=message["data"],
+                        message_type=message["type"],
+                        metadata={"node": node, "event_type": event_type}
+                    )
+                    yield message
                 else:
-                    yield {'type': 'action', 'data': f"[{node}]:{event_type}"}
+                    message = {'type': 'action', 'data': f"[{node}]:{event_type}"}
+                    await self.conversation_manager.save_message(
+                        session_id=self.session.session_id,
+                        role="assistant",
+                        content=message["data"],
+                        message_type=message["type"],
+                        metadata={"node": node, "event_type": event_type}
+                    )
+                    yield message
 
         except Exception as e:
             logger.error(f"处理流程时发生错误: {e} {traceback.format_exc()}")

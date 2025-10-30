@@ -9,6 +9,7 @@ from fastapi import APIRouter, WebSocket
 from core.workflow.graph2 import create_research_graph
 # from core.workflow.graph import create_research_graph
 from app.handler.flow import FlowHandler, Session
+from store.mongo.conversation import ConversationManager
 from starlette.websockets import WebSocketDisconnect, WebSocketState
 
 router = APIRouter(prefix="/api/v1")
@@ -27,6 +28,7 @@ class Request:
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     current_session_id: typing.Optional[str] = None
+    conversation_manager = ConversationManager()
 
     try:
         while True:
@@ -58,12 +60,23 @@ async def websocket_endpoint(websocket: WebSocket):
                     session.research_state.supply_query.append(request.query)
                 else:
                     session.research_state.supply_query = [request.query]
+                
+                # Save user message
+                await conversation_manager.save_message(
+                    session_id=session.session_id,
+                    role="user",
+                    content=request.query
+                )
 
             session.research_state.search_results_satisfactory = request.search_results_satisfactory
             session.research_state.report_satisfactory = request.report_satisfactory
 
             logger.info(f"Session: {session}")
-            handler = FlowHandler(graph=graph, session=session)
+            handler = FlowHandler(
+                graph=graph,
+                session=session,
+                conversation_manager=conversation_manager
+            )
             reply_generator = handler.handle()
 
             if reply_generator is None:

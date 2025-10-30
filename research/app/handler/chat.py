@@ -6,6 +6,7 @@ import io
 import os
 from datetime import datetime
 from db.mongo import mongodb
+from store.mongo.conversation import conversation_manager
 from core.common import get_logger
 
 logger = get_logger(__name__)
@@ -59,6 +60,43 @@ async def get_conversations() -> Optional[List[Dict]]:
     except Exception as e:
         print(f"Error getting all conversations: {e}")
         return []
+
+
+async def get_conversation_messages(session_id: str, limit: int = 100, skip: int = 0) -> Dict:
+    """
+    获取指定会话的对话消息记录
+    
+    :param session_id: 会话ID
+    :param limit: 返回消息数量限制，默认100
+    :param skip: 跳过消息数量，默认0
+    :return: 包含消息列表和元数据的字典
+    """
+    try:
+        # Get messages from conversation manager
+        messages = await conversation_manager.get_conversation_history(
+            session_id=session_id,
+            limit=limit,
+            skip=skip
+        )
+        
+        # Get total count
+        total_count = await conversation_manager.count_messages(session_id)
+        
+        logger.info(f"Retrieved {len(messages)} messages for session {session_id}")
+        
+        return {
+            "session_id": session_id,
+            "total_count": total_count,
+            "limit": limit,
+            "skip": skip,
+            "messages": messages
+        }
+    except Exception as e:
+        logger.error(f"Error getting conversation messages for session {session_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve conversation messages: {str(e)}"
+        )
 
 
 async def download_references_handler(session_id: str) -> StreamingResponse:
