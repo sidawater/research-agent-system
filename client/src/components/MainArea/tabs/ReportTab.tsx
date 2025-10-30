@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Card, Typography, Empty, Button, message, Input, Modal } from 'antd'
+import { Card, Typography, Empty, Button, message } from 'antd'
 import { useResearchStore } from '../../../stores/research'
 import { useAppStore } from '../../../stores/app'
 import ReactMarkdown from 'react-markdown'
@@ -12,8 +12,6 @@ const ReportTab: React.FC = () => {
   const { currentReport, phase } = useResearchStore()
   const { currentSession, config } = useAppStore()
   const [isExporting, setIsExporting] = useState(false)
-  const [showTitleModal, setShowTitleModal] = useState(false)
-  const [reportTitle, setReportTitle] = useState('')
 
   const handleExport = async () => {
     if (!currentReport) {
@@ -31,23 +29,17 @@ const ReportTab: React.FC = () => {
       return
     }
 
-    // Show title input modal
-    setShowTitleModal(true)
-  }
-
-  const handleConfirmExport = async () => {
-    if (!reportTitle.trim()) {
-      message.error('Please enter a title for the report')
-      return
-    }
+    // Generate automatic title based on timestamp
+    const now = new Date()
+    const timestamp = now.toISOString().replace(/[:.]/g, '-').substring(0, 19)
+    const title = `Research-Report-${timestamp}`
 
     setIsExporting(true)
-    setShowTitleModal(false)
 
     try {
       const result = await window.electronAPI?.exportReportWithPdf?.({
         sessionId: currentSession!,
-        title: reportTitle.trim(),
+        title: title,
         reportContent: currentReport!,
         exportDirectory: config.exportDirectory,
       })
@@ -63,7 +55,6 @@ const ReportTab: React.FC = () => {
       message.error(`Export failed: ${error.message}`)
     } finally {
       setIsExporting(false)
-      setReportTitle('')
     }
   }
 
@@ -76,49 +67,20 @@ const ReportTab: React.FC = () => {
   }
 
   return (
-    <>
-      <div style={{ height: '100%', overflowY: 'auto', padding: 24 }}>
-        <Card bordered>
-          <Title level={4}>Research Report</Title>
-          <div style={{ fontSize: 14 }}>
-            <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>{currentReport}</ReactMarkdown>
-          </div>
-          <div style={{ textAlign: 'right', marginTop: 12 }}>
-            <Button type="primary" onClick={handleExport} loading={isExporting}>
-              Export Report (MD + PDF)
-            </Button>
-          </div>
-          <Text type="secondary">Phase: {phase}</Text>
-        </Card>
-      </div>
-
-      <Modal
-        title="Export Report"
-        open={showTitleModal}
-        onOk={handleConfirmExport}
-        onCancel={() => {
-          setShowTitleModal(false)
-          setReportTitle('')
-        }}
-        okText="Export"
-        cancelText="Cancel"
-      >
-        <div style={{ marginBottom: 16 }}>
-          <Text>Enter a title for the exported report:</Text>
+    <div style={{ height: '100%', overflowY: 'auto', padding: 24 }}>
+      <Card bordered>
+        <Title level={4}>Research Report</Title>
+        <div style={{ fontSize: 14 }}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>{currentReport}</ReactMarkdown>
         </div>
-        <Input
-          placeholder="e.g., Research Report - AI Technology"
-          value={reportTitle}
-          onChange={(e) => setReportTitle(e.target.value)}
-          onPressEnter={handleConfirmExport}
-        />
-        <div style={{ marginTop: 12 }}>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            Files will be saved to: {config.exportDirectory}/{currentSession?.substring(0, 8)}-{new Date().toISOString().split('T')[0]}/
-          </Text>
+        <div style={{ textAlign: 'right', marginTop: 12 }}>
+          <Button type="primary" onClick={handleExport} loading={isExporting}>
+            Export Report (MD + PDF)
+          </Button>
         </div>
-      </Modal>
-    </>
+        <Text type="secondary">Phase: {phase}</Text>
+      </Card>
+    </div>
   )
 }
 
