@@ -6,17 +6,33 @@ interface AppConfig {
   apiServerUrl: string
   exportDirectory: string
   theme: 'light' | 'dark'
-  // 新增：Semantic Scholar API Key
+  // Semantic Scholar API Key
   semanticApiKey?: string
+  // 新增 OpenAI 配置
+  openAIBaseUrl?: string
+  openAIApiKey?: string
+  // 新增 MongoDB 配置
+  mongoConfig?: {
+    host: string
+    port: number
+    database: string
+    username?: string
+    password?: string
+  }
+  // 新增服务器端口
+  serverPort?: number
+  // 部署配置
+  deployment?: {
+    registry: string
+    imageName: string
+    composeFile: string
+    workingDirectory: string
+  }
 }
 
 interface AppState {
   theme: 'light' | 'dark'
   setTheme: (theme: 'light' | 'dark') => void
-
-  settingsVisible: boolean
-  showSettings: () => void
-  hideSettings: () => void
 
   connectionStatus: 'disconnected' | 'connecting' | 'connected'
   setConnectionStatus: (status: 'disconnected' | 'connecting' | 'connected') => void
@@ -24,7 +40,7 @@ interface AppState {
   currentSession: string | null
   setCurrentSession: (session: string | null) => void
 
-  // 新增：对话模式
+  // 对话模式
   mode: 'semantic' | 'deepseek'
   setMode: (m: 'semantic' | 'deepseek') => void
 
@@ -43,17 +59,13 @@ export const useAppStore = create<AppState>()(
         config: { ...state.config, theme } 
       })),
 
-      settingsVisible: false,
-      showSettings: () => set({ settingsVisible: true }),
-      hideSettings: () => set({ settingsVisible: false }),
-
       connectionStatus: 'disconnected',
       setConnectionStatus: (status) => set({ connectionStatus: status }),
 
       currentSession: null,
       setCurrentSession: (session) => set({ currentSession: session }),
 
-      // 新增：模式默认 semantic
+      // 模式默认 semantic
       mode: 'semantic',
       setMode: (m) => set({ mode: m }),
 
@@ -63,8 +75,26 @@ export const useAppStore = create<AppState>()(
         apiServerUrl: 'http://127.0.0.1:8000/api/v1',
         exportDirectory: '',
         theme: 'light',
-        // 新增默认空的 Semantic API Key
+        // Semantic API Key
         semanticApiKey: '',
+        // OpenAI 配置
+        openAIBaseUrl: '',
+        openAIApiKey: '',
+        // MongoDB 配置
+        mongoConfig: {
+          host: 'localhost',
+          port: 27017,
+          database: 'research_agent',
+        },
+        // 服务器端口
+        serverPort: 8000,
+        // 部署配置
+        deployment: {
+          registry: 'sidawater',
+          imageName: 'research-service',
+          composeFile: 'docker-compose.yml',
+          workingDirectory: 'd:/proj/research-agent-system',
+        },
       },
       updateConfig: (newConfig) =>
         set((state) => {
@@ -98,8 +128,13 @@ export const useAppStore = create<AppState>()(
             websocketUrl: config.websocketUrl,
             apiServerUrl: config.apiServerUrl,
             exportDirectory: config.exportDirectory,
-            // 持久化 Semantic API Key
+            // 持久化配置
             semanticApiKey: config.semanticApiKey,
+            openAIBaseUrl: config.openAIBaseUrl,
+            openAIApiKey: config.openAIApiKey,
+            mongoConfig: config.mongoConfig,
+            serverPort: config.serverPort,
+            deployment: config.deployment,
           })
         } catch (err) {
           console.error('Failed to save config to file:', err)

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Layout, Menu, Button, Space, Spin, message, Tooltip } from 'antd'
-import { MenuFoldOutlined, MenuUnfoldOutlined, MessageOutlined, FileTextOutlined, ReloadOutlined } from '@ant-design/icons'
+import { MessageOutlined, FileTextOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useAppStore } from '../../stores/app'
 import { useChatStore } from '../../stores/chat'
 import type { ChatMessage } from '../../stores/chat'
@@ -10,7 +10,6 @@ import { listHistory, getHistory, getConversationMessages, type ConversationHist
 const { Sider } = Layout
 
 const Sidebar: React.FC = () => {
-  const [collapsed, setCollapsed] = useState(false)
   const { theme, setCurrentSession } = useAppStore()
   const { setMessages } = useChatStore()
   const { setReferences, setCurrentReport, setPhase } = useResearchStore()
@@ -139,36 +138,28 @@ const Sidebar: React.FC = () => {
   return (
     <Sider
       trigger={null}
-      collapsible
-      collapsed={collapsed}
+      collapsible={false}
       width={260}
       style={{ 
         background: theme === 'light' ? '#fff' : '#001529', 
         maxWidth: '20%', 
-        overflow: 'hidden'
+        overflow: 'hidden',
+        height: '100%',
+        position: 'relative'
       }}
     >
       <div style={{ padding: '16px', borderBottom: `1px solid ${theme === 'light' ? '#f0f0f0' : '#303030'}` }}>
         <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-          {!collapsed && <span style={{ fontWeight: 'bold' }}>研究记录</span>}
-          <Space size={4}>
-            {!collapsed && (
-              <Tooltip title="刷新列表">
-                <Button 
-                  type="text" 
-                  icon={<ReloadOutlined />} 
-                  onClick={handleRefresh}
-                  loading={loading}
-                  size="small"
-                />
-              </Tooltip>
-            )}
+          <span style={{ fontWeight: 'bold' }}>研究记录</span>
+          <Tooltip title="刷新列表">
             <Button 
               type="text" 
-              icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />} 
-              onClick={() => setCollapsed(!collapsed)} 
+              icon={<ReloadOutlined />} 
+              onClick={handleRefresh}
+              loading={loading}
+              size="small"
             />
-          </Space>
+          </Tooltip>
         </Space>
       </div>
 

@@ -1,0 +1,15 @@
+[server]
+host = "0.0.0.0"
+port = 8001
+debug = false
+
+[docker_registry]
+url = "https://docker-registry.sidawater.top"
+username = "user"
+password = "password"
+verify_ssl = false
+timeout = 30
+
+[app_release]
+storage_path = "/data/releases"
+max_versions = 10

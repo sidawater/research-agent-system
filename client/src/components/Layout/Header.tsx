@@ -1,13 +1,13 @@
 import React from 'react'
 import { Layout, Button, Space, Typography, Tag, Tooltip } from 'antd'
-import { SettingOutlined, QuestionCircleOutlined, ExperimentOutlined } from '@ant-design/icons'
+import { ExperimentOutlined } from '@ant-design/icons'
 import { useAppStore } from '../../stores/app'
 
 const { Header } = Layout
 const { Title } = Typography
 
 const AppHeader: React.FC = () => {
-  const { connectionStatus, showSettings, theme, setTheme } = useAppStore()
+  const { connectionStatus, theme, setTheme } = useAppStore()
 
   const connectionStatusConfig: Record<string, { color: string; text: string }> = {
     disconnected: { color: 'red', text: '未连接' },
@@ -40,14 +40,6 @@ const AppHeader: React.FC = () => {
 
         <Tooltip title="切换主题">
           <Button icon={theme === 'light' ? '🌙' : '☀️'} onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} />
-        </Tooltip>
-
-        <Tooltip title="设置">
-          <Button icon={<SettingOutlined />} onClick={showSettings} />
-        </Tooltip>
-
-        <Tooltip title="帮助">
-          <Button icon={<QuestionCircleOutlined />} />
         </Tooltip>
       </Space>
     </Header>

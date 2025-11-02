@@ -27,3 +27,32 @@ body {
   height: 100%;
   overflow: hidden;
 }
+
+/* 右侧导航栏样式 */
+.right-navbar-container {
+  transition: all 0.2s;
+}
+
+/* 确保内容区域在导航栏展开时正确适配 */
+.app-content-with-navbar {
+  transition: margin-right 0.2s;
+}
+
+/* 设置页面左侧导航栏样式 */
+.settings-left-nav {
+  height: 100%;
+  border-right: 1px solid #f0f0f0;
+}
+
+.settings-left-nav .ant-menu-item {
+  margin: 0;
+  border-radius: 0;
+}
+
+/* 设置页面内容区域 */
+.settings-content {
+  padding: 24px;
+  height: 100%;
+  overflow-y: auto;
+  background-color: #fff;
+}

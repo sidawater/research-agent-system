@@ -24,3 +24,9 @@ services:
       - EXPORT_HOME=/app/var
     depends_on:
       - research-base
+
+  deploy-server:
+    build:
+      context: ./deploy-server
+      dockerfile: Dockerfile
+    image: docker-registry.sidawater.top/deploy-server:latest

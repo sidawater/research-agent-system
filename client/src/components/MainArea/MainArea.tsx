@@ -18,6 +18,7 @@ const MainArea: React.FC = () => {
           borderLeft: '1px solid #f0f0f0',
           maxWidth: '30%',
           overflow: 'hidden',
+          height: '100%',
         }}
       >
         <InfoZone />

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, shell, dialog, Menu } from 'electron'
 import { join } from 'path'
 import { fileURLToPath } from 'url'
 import fs from 'fs'
@@ -7,6 +7,7 @@ import http from 'http'
 import AdmZip from 'adm-zip'
 import { marked } from 'marked'
 import type { IpcMainInvokeEvent } from 'electron'
+import { DockerDeployer, DeploymentConfig } from './DockerDeployer.js'
 
 interface AppConfig {
   websocketUrl: string
@@ -14,6 +15,13 @@ interface AppConfig {
   exportDirectory: string
   // 新增：Semantic Scholar API Key
   semanticApiKey?: string
+  // 新增：部署配置
+  deployment?: {
+    registry: string
+    imageName: string
+    composeFile: string
+    workingDirectory: string
+  }
 }
 
 const DEFAULT_CONFIG: AppConfig = {
@@ -21,6 +29,12 @@ const DEFAULT_CONFIG: AppConfig = {
   apiServerUrl: 'http://127.0.0.1:18000/api/v1',
   exportDirectory: './data/',
   semanticApiKey: '',
+  deployment: {
+    registry: 'sidawater',
+    imageName: 'research-service',
+    composeFile: 'docker-compose.yml',
+    workingDirectory: 'd:/proj/research-agent-system',
+  },
 }
 
 function getConfigPath(): string {
@@ -63,6 +77,8 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    frame: false,              // Remove default window frame
+    titleBarStyle: 'hidden',   // Hide title bar (macOS)
     webPreferences: {
       preload: join(__dirname, 'preload.cjs'),
       // Keep isolation enabled for security; preload exposes APIs
@@ -191,6 +207,36 @@ App Path: ${app.getAppPath()}`
 }
 
 app.whenReady().then(() => {
+  // Create a menu with a DevTools option
+  const menu = Menu.buildFromTemplate([
+    {
+      label: 'View',
+      submenu: [
+        {
+          label: 'Open Developer Tools',
+          accelerator: 'CmdOrCtrl+Shift+I',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.openDevTools({ mode: 'detach' });
+            }
+          }
+        },
+        { type: 'separator' },
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' }
+      ]
+    }
+  ]);
+  
+  // Set the application menu
+  Menu.setApplicationMenu(menu);
+  
   createWindow()
 
   app.on('activate', () => {
@@ -677,3 +723,88 @@ ipcMain.handle('references:download', async (_evt: IpcMainInvokeEvent, payload: 
     }
   }
 })
+
+// Deployment IPC handlers
+ipcMain.handle(
+  'start-deployment',
+  async (
+    event,
+    payload: {
+      credentials: { username: string; password: string }
+      version: string
+      config: DeploymentConfig
+    }
+  ) => {
+    try {
+      const senderWindow = BrowserWindow.fromWebContents(event.sender)
+      const deployer = new DockerDeployer(payload.config, senderWindow || undefined)
+
+      await deployer.fullDeploy(payload.credentials, payload.version)
+
+      return {
+        success: true,
+        message: `部署成功: ${payload.version}`,
+        version: payload.version,
+      }
+    } catch (error: any) {
+      console.error('[Main] Deployment failed:', error)
+      return {
+        success: false,
+        message: error.message || '部署失败',
+        error: error.stack,
+      }
+    }
+  }
+)
+
+ipcMain.handle('check-docker-environment', async (event, config: DeploymentConfig) => {
+  try {
+    const senderWindow = BrowserWindow.fromWebContents(event.sender)
+    const deployer = new DockerDeployer(config, senderWindow || undefined)
+
+    await deployer.checkDockerEnvironment()
+    const currentVersion = await deployer.getCurrentVersion()
+
+    return {
+      success: true,
+      available: true,
+      currentVersion,
+    }
+  } catch (error: any) {
+    return {
+      success: false,
+      available: false,
+      error: error.message,
+    }
+  }
+})
+
+// Window control handlers
+ipcMain.handle('window:minimize', () => {
+  mainWindow?.minimize()
+})
+
+ipcMain.handle('window:maximize', () => {
+  if (mainWindow?.isMaximized()) {
+    mainWindow.unmaximize()
+  } else {
+    mainWindow?.maximize()
+  }
+})
+
+ipcMain.handle('window:close', () => {
+  mainWindow?.close()
+})
+
+ipcMain.handle('window:isMaximized', () => {
+  return mainWindow?.isMaximized() || false
+})
+
+// Add IPC handler for opening DevTools from renderer
+ipcMain.handle('open-dev-tools', async () => {
+  if (mainWindow) {
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
+    return { success: true };
+  }
+  return { success: false, error: 'MainWindow not available' };
+});
